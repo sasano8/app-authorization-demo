@@ -5,14 +5,14 @@ Google API のアクセストークンを取得するアプリではありませ
 
 ## ローカル起動
 
-Python 3.14 を使用します。
+Python 3.14 と uv 0.12.19 を使用します。依存は `pyproject.toml`、固定された解決結果は `uv.lock` で管理します。
+開発・CI は dev グループ込み、本番コンテナは `--no-dev` で同期します。
 
 ```sh
-python3.14 -m venv .venv
-.venv/bin/pip install -r requirements-dev.txt
+uv sync --locked
 export APP_ALLOW_LOCAL_LOGIN=true
-export APP_ACCESS_TOKEN_SIGNING_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
-.venv/bin/uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8080
+export APP_ACCESS_TOKEN_SIGNING_KEY="$(uv run --locked python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+uv run --locked uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8080
 ```
 
 ブラウザーでポート 8080 にアクセスし、`demo` / `demo` でログインします。
@@ -21,7 +21,7 @@ export APP_ACCESS_TOKEN_SIGNING_KEY="$(python -c 'import secrets; print(secrets.
 発行済み JWT は有効期限まで利用できます。SSO セッションは proxy のログアウト先が設定されている場合に終了します。
 
 ```sh
-.venv/bin/python -m pytest -q
+uv run --locked python -m pytest -q
 docker build -t app-authorization-demo:local .
 docker run --rm -p 8080:8080 -e APP_ALLOW_LOCAL_LOGIN -e APP_ACCESS_TOKEN_SIGNING_KEY app-authorization-demo:local
 ```
