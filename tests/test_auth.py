@@ -95,3 +95,32 @@ def test_sso_only():
 def test_invalid_signing_key():
     with pytest.raises(ValueError):
         create_app(Settings(signing_key='short', allow_local=True))
+
+@pytest.mark.parametrize('ttl', [1, 86400, 2592000])
+def test_requested_ttl(client, ttl):
+    response = client.post('/api/token', headers={CFG.id_header:google_token()}, json={'ttl_seconds':ttl})
+    assert response.status_code == 200
+    data = response.json()
+    assert data['expires_in'] == ttl
+    claims = jwt.decode(data['access_token'], KEY, algorithms=['HS256'], audience=CFG.audience, issuer=CFG.issuer)
+    assert claims['exp'] - claims['iat'] == ttl
+    assert client.get('/api/resource', headers={'Authorization':'Bearer '+data['access_token']}).status_code == 200
+
+@pytest.mark.parametrize('ttl', [0, -1, 2592001, 1.5, '3600', True])
+def test_invalid_requested_ttl(client, ttl):
+    assert client.post('/api/token', headers={CFG.id_header:google_token()}, json={'ttl_seconds':ttl}).status_code == 422
+
+def test_custom_ttl_policy():
+    cfg = Settings(allow_local=True, signing_key=KEY, ttl=60, max_ttl=120)
+    client = TestClient(create_app(cfg))
+    assert client.get('/api/token-policy').json() == {'default_ttl_seconds':60, 'max_ttl_seconds':120}
+    token = client.post('/api/login', json={'username':'demo','password':'demo'}).json()['id_token']
+    assert client.post('/api/token', json={'id_token':token}).json()['expires_in'] == 60
+    assert client.post('/api/token', json={'id_token':token,'ttl_seconds':None}).json()['expires_in'] == 60
+    assert client.post('/api/token', json={'id_token':token,'ttl_seconds':120}).json()['expires_in'] == 120
+    assert client.post('/api/token', json={'id_token':token,'ttl_seconds':121}).status_code == 422
+
+@pytest.mark.parametrize('ttl,max_ttl', [(0,120),(121,120),(60,0)])
+def test_invalid_ttl_configuration(ttl, max_ttl):
+    with pytest.raises(ValueError):
+        create_app(Settings(allow_local=True, signing_key=KEY, ttl=ttl, max_ttl=max_ttl))

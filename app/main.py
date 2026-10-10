@@ -8,7 +8,7 @@ import jwt
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from jwt import PyJWKClient
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 @dataclass(frozen=True)
@@ -21,6 +21,7 @@ class Settings:
     issuer: str = "app-authorization-demo"
     audience: str = "app-authorization-demo"
     ttl: int = 43200
+    max_ttl: int = 2592000
 
     @classmethod
     def from_env(cls):
@@ -33,6 +34,7 @@ class Settings:
             issuer=os.getenv("APP_ACCESS_TOKEN_ISSUER", "app-authorization-demo"),
             audience=os.getenv("APP_ACCESS_TOKEN_AUDIENCE", "app-authorization-demo"),
             ttl=int(os.getenv("APP_ACCESS_TOKEN_TTL_SECONDS", "43200")),
+            max_ttl=int(os.getenv("APP_ACCESS_TOKEN_MAX_TTL_SECONDS", "2592000")),
         )
 
 
@@ -43,13 +45,16 @@ class Login(BaseModel):
 
 class Exchange(BaseModel):
     id_token: str | None = None
+    ttl_seconds: int | None = Field(default=None, strict=True, gt=0)
 
 
 def create_app(settings=None, google_keys=None):
     cfg = settings or Settings.from_env()
     if len(cfg.signing_key.encode()) < 32:
         raise ValueError("APP_ACCESS_TOKEN_SIGNING_KEY must contain at least 32 bytes")
-    if cfg.ttl <= 0 or (not cfg.allow_local and not cfg.google_client_id):
+    if not 0 < cfg.ttl <= cfg.max_ttl:
+        raise ValueError("Token TTL must be positive and no greater than APP_ACCESS_TOKEN_MAX_TTL_SECONDS")
+    if (not cfg.allow_local and not cfg.google_client_id):
         raise ValueError("Positive token TTL and SSO_GOOGLE_CLIENT_ID (for SSO-only mode) are required")
     keys = google_keys or PyJWKClient("https://www.googleapis.com/oauth2/v3/certs")
     api = FastAPI(title="Authorization demo")
@@ -120,6 +125,10 @@ def create_app(settings=None, google_keys=None):
         return {"authenticated": False, "local_login_allowed": cfg.allow_local,
                 "logout_url": cfg.logout_url}
 
+    @api.get("/api/token-policy")
+    def token_policy():
+        return {"default_ttl_seconds": cfg.ttl, "max_ttl_seconds": cfg.max_ttl}
+
     @api.post("/api/login")
     def login(body: Login, request: Request):
         if cfg.id_header in request.headers:
@@ -138,10 +147,13 @@ def create_app(settings=None, google_keys=None):
         if not token:
             raise unauthorized()
         claims = identity(token, from_proxy=proxy)
+        ttl = cfg.ttl if body.ttl_seconds is None else body.ttl_seconds
+        if ttl > cfg.max_ttl:
+            raise HTTPException(422, f"ttl_seconds must be at most {cfg.max_ttl}")
         # Bind application identities to the upstream issuer as well as its subject.
         subject = claims["sub"] if claims["iss"] == cfg.issuer else "google:" + claims["sub"]
-        return {"access_token": mint(subject, "access", cfg.audience, cfg.ttl, scope="demo:read"),
-                "token_type": "Bearer", "expires_in": cfg.ttl}
+        return {"access_token": mint(subject, "access", cfg.audience, ttl, scope="demo:read"),
+                "token_type": "Bearer", "expires_in": ttl}
 
     @api.get("/api/resource")
     def resource(request: Request):

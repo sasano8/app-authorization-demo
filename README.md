@@ -19,7 +19,7 @@ uv run --locked uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8080
 「アクセストークン取得」→「リソースにアクセス」で認可成功のメッセージを確認できます。
 トークンはブラウザーのメモリに保持します。ログアウトは画面のトークンを破棄しますが、
 発行済み JWT は有効期限まで利用できます。
-`/tokens` に API 用トークンの取得・コピー専用画面があります。curl コマンドもコピーできます。
+`/tokens` に API 用トークンの取得・コピー専用画面があります。curl コマンドもコピーできます。有効期間を秒単位で指定でき、既定は12時間です。
 取得後は画面を開いている間、期限の1分前からトークンを再取得します。
 更新には有効な ID トークン（SSO では proxy が渡すトークン）が必要です。
 ID トークン自体の更新は SSO 基盤が担当し、ローカルでは再ログインが必要になります。
@@ -44,6 +44,7 @@ docker run --rm -p 8080:8080 -e APP_ALLOW_LOCAL_LOGIN -e APP_ACCESS_TOKEN_SIGNIN
 | アプリ専用 | `APP_ACCESS_TOKEN_ISSUER` | 既定 `app-authorization-demo` |
 | アプリ専用 | `APP_ACCESS_TOKEN_AUDIENCE` | 既定 `app-authorization-demo` |
 | アプリ専用 | `APP_ACCESS_TOKEN_TTL_SECONDS` | 既定 `43200`（12時間）、正の整数 |
+| アプリ専用 | `APP_ACCESS_TOKEN_MAX_TTL_SECONDS` | 既定 `2592000`（30日）、発行可能な最大 TTL |
 | ランタイム | `PORT` | コンテナの待受ポート。既定 `8080` |
 
 Infisical では `/sso/google` と `/apps/app-authorization-demo` などに分離し、
@@ -86,3 +87,16 @@ Knative デプロイは別作業です。`PORT`、署名鍵、SSO 設定を渡�
 
 自動テストはローカルログイン・交換・認可、およびテスト用 RSA 鍵による Google 検証を確認します。
 実際の Google ID トークンと proxy 接続は、SSO 基盤へのデプロイ後に別途確認が必要です。
+
+## 発行時の TTL 指定
+
+`POST /api/token` の JSON に `ttl_seconds` を追加すると有効期間を指定できます。
+例：`{"id_token":"<ID token>","ttl_seconds":86400}` は24時間で発行します。
+SSO ヘッダーが渡される場合、JSON の `id_token` は省略できます。
+TTL の省略または null は `APP_ACCESS_TOKEN_TTL_SECONDS` を使用します。
+1秒以上かつ `APP_ACCESS_TOKEN_MAX_TTL_SECONDS` 以下の整数だけを受け付け、不正な指定は422を返します。
+既定 TTL が上限を超える設定は起動時に拒否します。
+`GET /api/token-policy` が画面に既定値・上限を提供します。
+フロントエンド `/` は TTL を指定せず、既定値を使用します。
+`/tokens` の既存の自動再取得は継続し、発行時に指定した TTL で再取得します。
+入力欄を変更しただけでは発行済みトークンの TTL は変わりません。
