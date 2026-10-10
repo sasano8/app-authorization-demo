@@ -8,18 +8,18 @@
 <section><button id="issue" disabled>API 用トークンを取得</button><p id="expiry">未取得</p><textarea id="token" readonly aria-label="API用アクセストークン"></textarea><button id="copy" disabled>トークンをコピー</button><button id="copyCommand" disabled>curl コマンドをコピー</button><pre id="command"></pre><small>画面を開いている間は期限の1分前から再取得します。コピーしたトークンは更新されません。トークンを共有しないでください。</small></section>
 <section><p id="status" role="status"></p></section>
 <script>
-let idToken='',accessToken='',expiresAt=0,logoutUrl='',renewing=false;
+let idToken='',accessToken='',expiresAt=0,logoutUrl='',renewing=false,sessionVersion=0;
 const el=id=>document.getElementById(id);
 function command(){return 'curl '+JSON.stringify(location.origin+'/api/resource')+' \\\n  -H '+JSON.stringify('Authorization: Bearer '+accessToken);}
 function render(){el('token').value=accessToken;el('issue').disabled=!idToken;el('copy').disabled=!accessToken;el('copyCommand').disabled=!accessToken;el('command').textContent=accessToken?command():'';el('expiry').textContent=expiresAt?'有効期限：'+new Date(expiresAt).toLocaleString():'未取得';}
 async function api(path,body){const r=await fetch(path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw Error(d.detail||'リクエスト失敗');return d;}
 async function run(fn){try{await fn();}catch(e){el('status').textContent=e.message;}render();}
-async function issue(){const d=await api('/api/token',{id_token:idToken});accessToken=d.access_token;expiresAt=Date.now()+d.expires_in*1000;el('status').textContent='API 用トークンを取得しました。';}
+async function issue(){const version=sessionVersion;const d=await api('/api/token',{id_token:idToken});if(version!==sessionVersion)return;accessToken=d.access_token;expiresAt=Date.now()+d.expires_in*1000;el('status').textContent='API 用トークンを取得しました。';}
 el('login').onsubmit=e=>{e.preventDefault();run(async()=>{const d=await api('/api/login',Object.fromEntries(new FormData(e.target)));idToken=d.id_token;accessToken='';expiresAt=0;el('session').textContent='ローカルでログイン済み';el('status').textContent='API 用トークンを取得できます。';});};
 el('issue').onclick=()=>run(issue);
 el('copy').onclick=()=>run(async()=>{await navigator.clipboard.writeText(accessToken);el('status').textContent='トークンをコピーしました。';});
 el('copyCommand').onclick=()=>run(async()=>{await navigator.clipboard.writeText(command());el('status').textContent='curl コマンドをコピーしました。';});
-el('logout').onclick=()=>{idToken='';accessToken='';expiresAt=0;render();el('session').textContent='ログアウト済み';el('status').textContent='画面内のトークンを破棄しました。コピー済みの JWT は期限まで有効です。';if(logoutUrl)location.assign(logoutUrl);};
+el('logout').onclick=()=>{sessionVersion++;idToken='';accessToken='';expiresAt=0;render();el('session').textContent='ログアウト済み';el('status').textContent='画面内のトークンを破棄しました。コピー済みの JWT は期限まで有効です。';if(logoutUrl)location.assign(logoutUrl);};
 setInterval(()=>{if(accessToken&&expiresAt-Date.now()<60000&&!renewing){renewing=true;run(async()=>{try{await issue();}catch(e){accessToken='';expiresAt=0;throw Error('トークン更新に失敗しました。SSO セッションの確認または再ログインが必要です。');}finally{renewing=false;}});}},30000);
 run(async()=>{const d=await api('/api/session');logoutUrl=d.logout_url;el('login').hidden=!d.local_login_allowed;if(d.authenticated){idToken=d.id_token;el('session').textContent='SSO ログイン済み：'+d.user;}else{el('session').textContent=d.local_login_allowed?'ローカルログインが利用できます':'SSO ログインが必要です';}});
 </script></html>
