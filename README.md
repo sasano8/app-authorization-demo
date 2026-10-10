@@ -5,10 +5,10 @@ Google API のアクセストークンを取得するアプリではありませ
 
 ## ローカル起動
 
-Python 3.12 を使用します。
+Python 3.14 を使用します。
 
 ```sh
-python -m venv .venv
+python3.14 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
 export APP_ALLOW_LOCAL_LOGIN=true
 export APP_ACCESS_TOKEN_SIGNING_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
