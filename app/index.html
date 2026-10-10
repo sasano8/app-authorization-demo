@@ -2,20 +2,22 @@
 <html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>認可サンプル</title>
 <style>body{font-family:system-ui;margin:40px auto;padding:0 20px;max-width:800px;background:#f5f7fb;color:#17233b}section{background:white;padding:24px;border-radius:12px;margin:18px 0}button,input{padding:10px;margin:5px}button{cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere}textarea{width:100%;height:100px;box-sizing:border-box}small{color:#526078}</style>
-<h1>認可サンプル</h1><p>ログイン → ID トークン → アクセストークン → リソース</p>
+<h1>認可サンプル</h1><p><a href="/tokens">API 用トークンの取得・コピー</a></p><p>ログイン → ID トークン → アクセストークン → リソース</p>
 <section><p id="session">セッション確認中…</p><form id="login" hidden><input name="username" aria-label="ユーザー名" value="demo" required><input name="password" aria-label="パスワード" type="password" value="demo" required><button>ログイン</button><p><small>ローカルデモ用：demo / demo</small></p></form><button id="logout">ログアウト</button></section>
 <section><button id="exchange" disabled>アクセストークン取得</button><button id="resource" disabled>リソースにアクセス</button><details><summary>ID トークン</summary><textarea id="idToken" readonly aria-label="IDトークン"></textarea><button id="copyId">コピー</button></details><details><summary>アクセストークン</summary><textarea id="accessToken" readonly aria-label="アクセストークン"></textarea><button id="copyAccess">コピー</button></details><p><small>トークンは秘密情報です。共有しないでください。</small></p></section>
 <section><h2>結果</h2><pre id="result" role="status"></pre></section>
 <script>
-let idToken='',accessToken='',logoutUrl='';
+let idToken='',accessToken='',logoutUrl='',expiresAt=0,renewing=false;
 const el=id=>document.getElementById(id);
 function render(){el('idToken').value=idToken;el('accessToken').value=accessToken;el('exchange').disabled=!idToken;el('resource').disabled=!accessToken;}
 async function api(path,options={}){const r=await fetch(path,{...options,headers:{'Content-Type':'application/json',...options.headers}});const data=await r.json();el('result').textContent=JSON.stringify({status:r.status,...data},null,2);if(!r.ok)throw Error(data.detail||'リクエスト失敗');return data;}
 async function run(fn){try{await fn();}catch(e){el('result').textContent=e.message;}render();}
 el('login').onsubmit=e=>{e.preventDefault();run(async()=>{const f=new FormData(e.target);const d=await api('/api/login',{method:'POST',body:JSON.stringify(Object.fromEntries(f))});idToken=d.id_token;accessToken='';el('session').textContent='ローカルでログイン済み';});};
-el('exchange').onclick=()=>run(async()=>{accessToken='';const d=await api('/api/token',{method:'POST',body:JSON.stringify({id_token:idToken})});accessToken=d.access_token;});
-el('resource').onclick=()=>run(()=>api('/api/resource',{headers:{Authorization:'Bearer '+accessToken}}));
-el('logout').onclick=()=>{idToken='';accessToken='';el('result').textContent='画面内のトークンを破棄しました。発行済み JWT は期限まで有効です。';el('session').textContent='ログアウト済み';render();if(logoutUrl)location.assign(logoutUrl);};
+async function renew(){const d=await api('/api/token',{method:'POST',body:JSON.stringify({id_token:idToken})});accessToken=d.access_token;expiresAt=Date.now()+d.expires_in*1000;}
+el('exchange').onclick=()=>run(renew);
+setInterval(()=>{if(accessToken&&expiresAt-Date.now()<60000&&!renewing){renewing=true;run(async()=>{try{await renew();}catch(e){accessToken='';expiresAt=0;throw Error('トークン更新に失敗しました。SSO セッションの確認または再ログインが必要です。');}finally{renewing=false;}});}},30000);
+el('resource').onclick=()=>run(async()=>{if(expiresAt-Date.now()<60000)await renew();return api('/api/resource',{headers:{Authorization:'Bearer '+accessToken}});});
+el('logout').onclick=()=>{idToken='';accessToken='';expiresAt=0;el('result').textContent='画面内のトークンを破棄しました。発行済み JWT は期限まで有効です。';el('session').textContent='ログアウト済み';render();if(logoutUrl)location.assign(logoutUrl);};
 el('copyId').onclick=()=>run(()=>navigator.clipboard.writeText(idToken));el('copyAccess').onclick=()=>run(()=>navigator.clipboard.writeText(accessToken));
 run(async()=>{const d=await api('/api/session');logoutUrl=d.logout_url;el('login').hidden=!d.local_login_allowed;if(d.authenticated){idToken=d.id_token;el('session').textContent='SSO ログイン済み：'+d.user;}else{el('session').textContent=d.local_login_allowed?'ローカルログインが利用できます':'SSO ログインが必要です';}});
 </script></html>

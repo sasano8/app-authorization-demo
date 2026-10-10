@@ -34,12 +34,18 @@ def access_token(**overrides):
 
 def test_local_flow(client):
     assert client.get('/').status_code == 200
+    page = client.get('/tokens')
+    assert page.status_code == 200
+    assert 'API 用トークンの取得' in page.text
     assert client.get('/healthz').json() == {'status': 'ok'}
     assert client.get('/api/session').json()['local_login_allowed']
     login = client.post('/api/login', json={'username':'demo','password':'demo'})
     assert login.status_code == 200
     token = client.post('/api/token', json={'id_token':login.json()['id_token']})
     assert token.status_code == 200
+    assert token.json()['expires_in'] == 43200
+    claims = jwt.decode(token.json()['access_token'], KEY, algorithms=['HS256'], audience=CFG.audience, issuer=CFG.issuer)
+    assert claims['exp'] - claims['iat'] == 43200
     response = client.get('/api/resource', headers={'Authorization':'Bearer '+token.json()['access_token']})
     assert response.status_code == 200
     assert response.json()['message'] == '認可に成功しました'

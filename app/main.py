@@ -102,6 +102,10 @@ def create_app(settings=None, google_keys=None):
     def index():
         return FileResponse(Path(__file__).with_name("index.html"))
 
+    @api.get("/tokens")
+    def tokens_page():
+        return FileResponse(Path(__file__).with_name("tokens.html"))
+
     @api.get("/healthz")
     def health():
         return {"status": "ok"}
