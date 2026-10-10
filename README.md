@@ -36,8 +36,8 @@ docker run --rm -p 8080:8080 -e APP_ALLOW_LOCAL_LOGIN -e APP_ACCESS_TOKEN_SIGNIN
 | アプリ専用 | `APP_ALLOW_LOCAL_LOGIN` | 既定 `false`。`true` のときヘッダーなしでデモログイン可能 |
 | アプリ専用 | `APP_ACCESS_TOKEN_SIGNING_KEY` | 必須。32 バイト以上のランダムな秘密鍵 |
 | アプリ専用 | `APP_ACCESS_TOKEN_ISSUER` | 既定 `app-authorization-demo` |
-| アプリ専用 | `APP_ACCESS_TOKEN_AUDIENCE` | 既定 `app-authorization-demo-api` |
-| アプリ専用 | `APP_ACCESS_TOKEN_TTL_SECONDS` | 既定 `300`、正の整数 |
+| アプリ専用 | `APP_ACCESS_TOKEN_AUDIENCE` | 既定 `app-authorization-demo` |
+| アプリ専用 | `APP_ACCESS_TOKEN_TTL_SECONDS` | 既定 `86400`（24時間）、正の整数 |
 | ランタイム | `PORT` | コンテナの待受ポート。既定 `8080` |
 
 Infisical では `/sso/google` と `/apps/app-authorization-demo` などに分離し、

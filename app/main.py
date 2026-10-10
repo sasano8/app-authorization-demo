@@ -19,8 +19,8 @@ class Settings:
     logout_url: str = ""
     signing_key: str = ""
     issuer: str = "app-authorization-demo"
-    audience: str = "app-authorization-demo-api"
-    ttl: int = 300
+    audience: str = "app-authorization-demo"
+    ttl: int = 86400
 
     @classmethod
     def from_env(cls):
@@ -31,8 +31,8 @@ class Settings:
             logout_url=os.getenv("SSO_LOGOUT_URL", ""),
             signing_key=os.getenv("APP_ACCESS_TOKEN_SIGNING_KEY", ""),
             issuer=os.getenv("APP_ACCESS_TOKEN_ISSUER", "app-authorization-demo"),
-            audience=os.getenv("APP_ACCESS_TOKEN_AUDIENCE", "app-authorization-demo-api"),
-            ttl=int(os.getenv("APP_ACCESS_TOKEN_TTL_SECONDS", "300")),
+            audience=os.getenv("APP_ACCESS_TOKEN_AUDIENCE", "app-authorization-demo"),
+            ttl=int(os.getenv("APP_ACCESS_TOKEN_TTL_SECONDS", "86400")),
         )
 
 
