@@ -20,7 +20,7 @@ class Settings:
     signing_key: str = ""
     issuer: str = "app-authorization-demo"
     audience: str = "app-authorization-demo"
-    ttl: int = 86400
+    ttl: int = 43200
 
     @classmethod
     def from_env(cls):
@@ -32,7 +32,7 @@ class Settings:
             signing_key=os.getenv("APP_ACCESS_TOKEN_SIGNING_KEY", ""),
             issuer=os.getenv("APP_ACCESS_TOKEN_ISSUER", "app-authorization-demo"),
             audience=os.getenv("APP_ACCESS_TOKEN_AUDIENCE", "app-authorization-demo"),
-            ttl=int(os.getenv("APP_ACCESS_TOKEN_TTL_SECONDS", "86400")),
+            ttl=int(os.getenv("APP_ACCESS_TOKEN_TTL_SECONDS", "43200")),
         )
 
 
