@@ -37,6 +37,7 @@ docker run --rm -p 8080:8080 -e APP_ALLOW_LOCAL_LOGIN -e APP_ACCESS_TOKEN_SIGNIN
 
 | 領域 | 環境変数 | 内容 |
 |---|---|---|
+| SSO 共通 | `SSO_ID_TOKEN_HEADER` | ID トークンのヘッダー名。既定 `X-Forwarded-Id-Token`。実際の proxy 設定に合わせる |
 | SSO 共通 | `SSO_GOOGLE_CLIENT_ID` | Google ID トークンの期待する `aud`。SSO-only では必須 |
 | SSO 共通 | `SSO_LOGOUT_URL` | 任意。信頼する proxy のログアウト URL |
 | アプリ専用 | `APP_ALLOW_LOCAL_LOGIN` | 既定 `false`。`true` のときヘッダーなしでデモログイン可能 |
@@ -113,15 +114,16 @@ Knative デプロイは別作業です。`PORT`、署名鍵、SSO 設定を渡�
 
 プロキシは ID トークンを `Authorization: Bearer <ID トークン>` で返す設定を持つことが多いです。
 一方、このアプリは `Authorization` を API のアクセストークン用に使います（`/api/resource`）。
-混ざらないよう、アプリは標準ではない独自ヘッダー `X-Forwarded-Id-Token`（名前は固定）で ID トークンを受けます。
-標準とは、認証情報を運ぶために HTTP で決められた `Authorization` ヘッダーのことです。ヘッダー名の違いは、リバースプロキシ側で付け替えて吸収してください。
+混ざらないよう、アプリは標準ではない独自ヘッダー（`SSO_ID_TOKEN_HEADER`、既定 `X-Forwarded-Id-Token`）で ID トークンを受けます。
+標準とは、認証情報を運ぶために HTTP で決められた `Authorization` ヘッダーのことです。
 値は `Bearer <トークン>` の形でもトークンだけでも構いません。
 
 ### 設定の概要
 
 1. 認証用プロキシ側で「ID トークンを上流（アプリ）へ渡す」設定を有効にします。設定名は実装やバージョンで異なるので、公式ドキュメントで確認してください。
-2. リバースプロキシで、そのトークンを `X-Forwarded-Id-Token` に付け替えてアプリへ転送します。
+2. リバースプロキシで、そのトークンを `X-Forwarded-Id-Token`（または `SSO_ID_TOKEN_HEADER` で指定した名前）に付け替えてアプリへ転送します。
 3. クライアントが同名のヘッダーを自分で付けて送れないよう、リバースプロキシで先に削除します。
+4. `SSO_ID_TOKEN_HEADER` を変えた場合は、2 と 3 のヘッダー名も同じにします。
 
 Caddy で考え方を示す例です（実環境の細部は、使用するバージョンのドキュメントで確認してください）。
 

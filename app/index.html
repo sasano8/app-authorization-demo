@@ -7,8 +7,8 @@
 <section><button id="exchange" disabled>アクセストークン取得</button><button id="resource" disabled>リソースにアクセス</button><details><summary>ID トークン</summary><textarea id="idToken" readonly aria-label="IDトークン"></textarea><button id="copyId">コピー</button></details><details><summary>アクセストークン</summary><textarea id="accessToken" readonly aria-label="アクセストークン"></textarea><button id="copyAccess">コピー</button></details><p><small>トークンは秘密情報です。共有しないでください。</small></p></section>
 <section><details><summary>ID トークンについて（初めての方へ）</summary>
 <p>ID トークンは「Google でログインした」ことを示す証明書です。ブラウザではなく、リバースプロキシ（oauth2-proxy など）が Google から受け取ります。</p>
-<p>このアプリは ID トークンを、標準ではない独自ヘッダー（<code>X-Forwarded-Id-Token</code>）で受け取ります。標準とは、認証情報を運ぶために HTTP で決められた <code>Authorization</code> ヘッダー（例：<code>Authorization: Bearer ...</code>）のことです。このアプリは <code>Authorization</code> を API のアクセストークン用に使うため、ID トークンは別の独自ヘッダーで受け取ります。</p>
-<p>ヘッダー名の違いは、リバースプロキシ側で付け替えて吸収してください。届いていれば、このページに「SSO ログイン済み」と ID トークンが表示されます。</p>
+<p>このアプリは ID トークンを、標準ではない独自ヘッダー（既定は <code>X-Forwarded-Id-Token</code>。環境変数 <code>SSO_ID_TOKEN_HEADER</code> で変更可）で受け取ります。標準とは、認証情報を運ぶために HTTP で決められた <code>Authorization</code> ヘッダー（例：<code>Authorization: Bearer ...</code>）のことです。このアプリは <code>Authorization</code> を API のアクセストークン用に使うため、ID トークンは別の独自ヘッダーで受け取ります。</p>
+<p>届いていれば、このページに「SSO ログイン済み」と ID トークンが表示されます。</p>
 <p>通常の本番では、ログイン確認はプロキシが済ませるので、<b>ID トークンはアプリへ渡さない</b>のが基本です（メールアドレスなど結果だけを渡します）。トークンは漏れると悪用できる秘密情報なので、自分で検証が必要なアプリにだけ渡してください。このデモは学習用に渡し、画面にも表示しています。</p>
 <p>渡し方の概要は README の「ID トークンをアプリに渡す設定」を参照してください。</p></details></section>
 <section><h2>結果</h2><pre id="result" role="status"></pre></section>

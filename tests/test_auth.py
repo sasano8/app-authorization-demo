@@ -154,3 +154,11 @@ def test_session_reports_header_status(client):
     assert ID_TOKEN_HEADER in bad.json()['detail'] and 'not valid' in bad.json()['detail']
     other = client.post('/api/token', json={}, headers={ID_TOKEN_HEADER: 'not-a-jwt'})
     assert other.json()['detail'] == 'Invalid or missing token'
+
+
+def test_custom_id_token_header_name():
+    cfg = Settings(signing_key=KEY, google_client_id='google-client', id_header='X-My-Id-Token')
+    c = TestClient(create_app(cfg, GoogleKeys()))
+    r = c.get('/api/session', headers={'X-My-Id-Token': google_token()}).json()
+    assert r['authenticated'] and r['id_token_header'] == {'name': 'X-My-Id-Token', 'received': True}
+    assert not c.get('/api/session', headers={ID_TOKEN_HEADER: google_token()}).json()['authenticated']
