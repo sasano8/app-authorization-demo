@@ -48,6 +48,17 @@ docker run --rm -p 8080:8080 -e APP_ALLOW_LOCAL_LOGIN -e APP_ACCESS_TOKEN_SIGNIN
 | アプリ専用 | `APP_ACCESS_TOKEN_MAX_TTL_SECONDS` | 既定 `2592000`（30日）、発行可能な最大 TTL |
 | ランタイム | `PORT` | コンテナの待受ポート。既定 `8080` |
 
+### 設定のドライラン
+
+起動前に必須設定を検証できます。値は出力せず、項目ごとの成否とエラー理由だけを表示し、1 つでも失敗すると終了コード 1 を返します。
+
+```sh
+docker run --rm -e SSO_GOOGLE_CLIENT_ID -e APP_ACCESS_TOKEN_SIGNING_KEY \
+  ghcr.io/sasano8/app-authorization-demo:latest python -m app.check
+```
+
+実行時エラー（Google 鍵の取得失敗など）は検証対象外です。
+
 Infisical では `/sso/google` と `/apps/app-authorization-demo` などに分離し、
 Kubernetes Secret 経由で Knative の環境変数に注入してください。
 署名鍵は同一アプリの全レプリカで共有し、他アプリや開発環境とは分離します。

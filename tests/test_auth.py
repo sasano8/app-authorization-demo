@@ -124,3 +124,14 @@ def test_custom_ttl_policy():
 def test_invalid_ttl_configuration(ttl, max_ttl):
     with pytest.raises(ValueError):
         create_app(Settings(allow_local=True, signing_key=KEY, ttl=ttl, max_ttl=max_ttl))
+
+def test_check_env_reports_every_problem_without_values():
+    from app.main import check_env
+    secret = 'x' * 40
+    ok = {c.name: c for c in check_env({'SSO_GOOGLE_CLIENT_ID': 'cid', 'APP_ACCESS_TOKEN_SIGNING_KEY': secret})}
+    assert all(c.ok for c in ok.values())
+    bad = {c.name: c for c in check_env({'APP_ACCESS_TOKEN_SIGNING_KEY': 'short'})}
+    assert not bad['SSO_GOOGLE_CLIENT_ID'].ok and not bad['APP_ACCESS_TOKEN_SIGNING_KEY'].ok
+    assert 'short' not in repr(bad)
+    assert check_env({'APP_ACCESS_TOKEN_TTL_SECONDS': 'abc'})[0].error == 'must be an integer'
+    assert all(c.ok for c in check_env({'APP_ALLOW_LOCAL_LOGIN': 'true', 'APP_ACCESS_TOKEN_SIGNING_KEY': secret}))

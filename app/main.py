@@ -24,17 +24,18 @@ class Settings:
     max_ttl: int = 2592000
 
     @classmethod
-    def from_env(cls):
+    def from_env(cls, environ=None):
+        os_getenv = (environ if environ is not None else os.environ).get
         return cls(
-            allow_local=os.getenv("APP_ALLOW_LOCAL_LOGIN", "false").lower() == "true",
-            id_header=os.getenv("SSO_ID_TOKEN_HEADER", "X-Forwarded-Id-Token"),
-            google_client_id=os.getenv("SSO_GOOGLE_CLIENT_ID", ""),
-            logout_url=os.getenv("SSO_LOGOUT_URL", ""),
-            signing_key=os.getenv("APP_ACCESS_TOKEN_SIGNING_KEY", ""),
-            issuer=os.getenv("APP_ACCESS_TOKEN_ISSUER", "app-authorization-demo"),
-            audience=os.getenv("APP_ACCESS_TOKEN_AUDIENCE", "app-authorization-demo"),
-            ttl=int(os.getenv("APP_ACCESS_TOKEN_TTL_SECONDS", "43200")),
-            max_ttl=int(os.getenv("APP_ACCESS_TOKEN_MAX_TTL_SECONDS", "2592000")),
+            allow_local=os_getenv("APP_ALLOW_LOCAL_LOGIN", "false").lower() == "true",
+            id_header=os_getenv("SSO_ID_TOKEN_HEADER", "X-Forwarded-Id-Token"),
+            google_client_id=os_getenv("SSO_GOOGLE_CLIENT_ID", ""),
+            logout_url=os_getenv("SSO_LOGOUT_URL", ""),
+            signing_key=os_getenv("APP_ACCESS_TOKEN_SIGNING_KEY", ""),
+            issuer=os_getenv("APP_ACCESS_TOKEN_ISSUER", "app-authorization-demo"),
+            audience=os_getenv("APP_ACCESS_TOKEN_AUDIENCE", "app-authorization-demo"),
+            ttl=int(os_getenv("APP_ACCESS_TOKEN_TTL_SECONDS", "43200")),
+            max_ttl=int(os_getenv("APP_ACCESS_TOKEN_MAX_TTL_SECONDS", "2592000")),
         )
 
 
@@ -48,14 +49,40 @@ class Exchange(BaseModel):
     ttl_seconds: int | None = Field(default=None, strict=True, gt=0)
 
 
+@dataclass(frozen=True)
+class Check:
+    name: str
+    ok: bool
+    error: str = ""
+
+
+def validate(cfg):
+    """Check startup settings without exposing their values."""
+    google_ok = cfg.allow_local or bool(cfg.google_client_id)
+    return [
+        Check("SSO_GOOGLE_CLIENT_ID", google_ok,
+              "" if google_ok else "required when APP_ALLOW_LOCAL_LOGIN is not true (SSO-only mode)"),
+        Check("APP_ACCESS_TOKEN_SIGNING_KEY", len(cfg.signing_key.encode()) >= 32,
+              "must contain at least 32 bytes"),
+        Check("APP_ACCESS_TOKEN_TTL_SECONDS", 0 < cfg.ttl <= cfg.max_ttl,
+              "must be positive and no greater than APP_ACCESS_TOKEN_MAX_TTL_SECONDS"),
+    ]
+
+
+def check_env(environ=None):
+    """Dry run: validate settings from the environment and report every problem."""
+    env = os.environ if environ is None else environ
+    bad = [Check(name, False, "must be an integer")
+           for name in ("APP_ACCESS_TOKEN_TTL_SECONDS", "APP_ACCESS_TOKEN_MAX_TTL_SECONDS")
+           if not env.get(name, "0").strip().lstrip("-").isdigit()]
+    return bad or validate(Settings.from_env(env))
+
+
 def create_app(settings=None, google_keys=None):
     cfg = settings or Settings.from_env()
-    if len(cfg.signing_key.encode()) < 32:
-        raise ValueError("APP_ACCESS_TOKEN_SIGNING_KEY must contain at least 32 bytes")
-    if not 0 < cfg.ttl <= cfg.max_ttl:
-        raise ValueError("Token TTL must be positive and no greater than APP_ACCESS_TOKEN_MAX_TTL_SECONDS")
-    if (not cfg.allow_local and not cfg.google_client_id):
-        raise ValueError("Positive token TTL and SSO_GOOGLE_CLIENT_ID (for SSO-only mode) are required")
+    for check in validate(cfg):
+        if not check.ok:
+            raise ValueError(f"{check.name}: {check.error}")
     keys = google_keys or PyJWKClient("https://www.googleapis.com/oauth2/v3/certs")
     api = FastAPI(title="Authorization demo")
 
