@@ -3,6 +3,11 @@
 <title>認可サンプル</title>
 <style>body{font-family:system-ui;margin:40px auto;padding:0 20px;max-width:800px;background:#f5f7fb;color:#17233b}section{background:white;padding:24px;border-radius:12px;margin:18px 0}button,input{padding:10px;margin:5px}button{cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere}textarea{width:100%;height:100px;box-sizing:border-box}small{color:#526078}code{background:#eef1f7;padding:1px 4px;border-radius:4px}</style>
 <h1>認可サンプル</h1><p><a href="/tokens">API 用トークンの取得・コピー</a></p><p>ログイン → ID トークン → アクセストークン → リソース</p>
+<section><b>認証 → 認可</b>
+<p><b>認証</b>（リバースプロキシ）：Google でログインし、「誰か」を確かめる。ID トークンを受け取る。</p>
+<p style="margin:0 0 0 12px">↓ ID トークン</p>
+<p><b>認可</b>（このアプリ）：ID トークンを自分で検証し、API 用のアクセストークンを発行する。API はアクセストークンで「何をしてよいか」を判断する。</p>
+<p><small>このアプリは認証をしません。認証はプロキシの仕事で、このアプリは認可のサンプルです。ID トークンはアクセストークンを発行するときに使い、API の呼び出しにはアクセストークンだけを使います。</small></p></section>
 <section><p id="session">セッション確認中…</p><p id="diag"><small></small></p><form id="login" hidden><input name="username" aria-label="ユーザー名" value="demo" required><input name="password" aria-label="パスワード" type="password" value="demo" required><button>ログイン</button><p><small>ローカルデモ用：demo / demo</small></p></form><button id="logout">ログアウト</button></section>
 <section><button id="exchange" disabled>アクセストークン取得</button><button id="resource" disabled>リソースにアクセス</button><details><summary>ID トークン</summary><textarea id="idToken" readonly aria-label="IDトークン"></textarea><button id="copyId">コピー</button></details><details><summary>アクセストークン</summary><textarea id="accessToken" readonly aria-label="アクセストークン"></textarea><button id="copyAccess">コピー</button></details><p><small>トークンは秘密情報です。共有しないでください。</small></p></section>
 <section><details><summary>ID トークンについて（初めての方へ）</summary>
