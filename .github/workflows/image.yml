@@ -39,8 +39,10 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
-          push: true
           platforms: linux/amd64,linux/arm64
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             ghcr.io/sasano8/app-authorization-demo:latest
             ghcr.io/sasano8/app-authorization-demo:${{ github.sha }}
