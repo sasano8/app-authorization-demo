@@ -135,3 +135,10 @@ def test_check_env_reports_every_problem_without_values():
     assert 'short' not in repr(bad)
     assert check_env({'APP_ACCESS_TOKEN_TTL_SECONDS': 'abc'})[0].error == 'must be an integer'
     assert all(c.ok for c in check_env({'APP_ALLOW_LOCAL_LOGIN': 'true', 'APP_ACCESS_TOKEN_SIGNING_KEY': secret}))
+
+@pytest.mark.parametrize('prefix', ['', 'Bearer ', 'bearer '])
+def test_proxy_token_accepts_optional_bearer_prefix(client, prefix):
+    cfg = Settings(allow_local=False, signing_key=KEY, google_client_id='google-client')
+    sso = TestClient(create_app(cfg, GoogleKeys()))
+    r = sso.get('/api/session', headers={cfg.id_header: prefix + google_token()})
+    assert r.json()['authenticated'] is True

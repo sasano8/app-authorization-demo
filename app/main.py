@@ -94,6 +94,12 @@ def create_app(settings=None, google_keys=None):
         response.headers["Referrer-Policy"] = "no-referrer"
         return response
 
+    def proxy_token(request):
+        # The proxy may forward the ID token as "Bearer <token>" (Authorization style) or bare.
+        value = request.headers[cfg.id_header].strip()
+        scheme, _, rest = value.partition(" ")
+        return rest.strip() if scheme.lower() == "bearer" and rest.strip() else value
+
     def unauthorized():
         return HTTPException(401, "Invalid or missing token", headers={"WWW-Authenticate": "Bearer"})
 
@@ -145,7 +151,7 @@ def create_app(settings=None, google_keys=None):
     @api.get("/api/session")
     def session(request: Request):
         if cfg.id_header in request.headers:
-            token = request.headers[cfg.id_header]
+            token = proxy_token(request)
             claims = identity(token, from_proxy=True)
             return {"authenticated": True, "user": claims["sub"], "id_token": token,
                     "local_login_allowed": False, "logout_url": cfg.logout_url}
@@ -159,7 +165,7 @@ def create_app(settings=None, google_keys=None):
     @api.post("/api/login")
     def login(body: Login, request: Request):
         if cfg.id_header in request.headers:
-            identity(request.headers[cfg.id_header], from_proxy=True)
+            identity(proxy_token(request), from_proxy=True)
             raise HTTPException(403, "Use your SSO session")
         if not cfg.allow_local:
             raise HTTPException(403, "Local login is disabled")
@@ -170,7 +176,7 @@ def create_app(settings=None, google_keys=None):
     @api.post("/api/token")
     def exchange(body: Exchange, request: Request):
         proxy = cfg.id_header in request.headers
-        token = request.headers[cfg.id_header] if proxy else body.id_token
+        token = proxy_token(request) if proxy else body.id_token
         if not token:
             raise unauthorized()
         claims = identity(token, from_proxy=proxy)

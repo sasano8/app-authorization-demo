@@ -5,6 +5,11 @@
 <h1>認可サンプル</h1><p><a href="/tokens">API 用トークンの取得・コピー</a></p><p>ログイン → ID トークン → アクセストークン → リソース</p>
 <section><p id="session">セッション確認中…</p><form id="login" hidden><input name="username" aria-label="ユーザー名" value="demo" required><input name="password" aria-label="パスワード" type="password" value="demo" required><button>ログイン</button><p><small>ローカルデモ用：demo / demo</small></p></form><button id="logout">ログアウト</button></section>
 <section><button id="exchange" disabled>アクセストークン取得</button><button id="resource" disabled>リソースにアクセス</button><details><summary>ID トークン</summary><textarea id="idToken" readonly aria-label="IDトークン"></textarea><button id="copyId">コピー</button></details><details><summary>アクセストークン</summary><textarea id="accessToken" readonly aria-label="アクセストークン"></textarea><button id="copyAccess">コピー</button></details><p><small>トークンは秘密情報です。共有しないでください。</small></p></section>
+<section><details><summary>ID トークンについて（初めての方へ）</summary>
+<p>ID トークンは「Google でログインした」ことを示す証明書です。ブラウザではなく、リバースプロキシ（oauth2-proxy など）が Google から受け取ります。</p>
+<p>このデモは「アプリが自分で ID トークンを検証する」流れを学ぶためのものです。そのため、プロキシがログイン後のリクエストに ID トークンを付けてアプリへ渡す設定が必要です。ここに「SSO ログインが必要です」と出る場合は、ログイン済みでも ID トークンがアプリに届いていません。</p>
+<p>通常の本番では、ログイン確認はプロキシが済ませるので、<b>ID トークンはアプリへ渡さない</b>のが基本です（メールアドレスなど結果だけを渡します）。トークンは漏れると悪用できる秘密情報なので、自分で検証が必要なアプリにだけ渡してください。このデモは学習用に渡し、画面にも表示しています。</p>
+<p>渡し方の概要は README の「ID トークンをアプリに渡す設定」を参照してください。</p></details></section>
 <section><h2>結果</h2><pre id="result" role="status"></pre></section>
 <script>
 let idToken='',accessToken='',logoutUrl='',expiresAt=0,renewing=false,sessionVersion=0;
@@ -19,5 +24,5 @@ setInterval(()=>{if(accessToken&&expiresAt-Date.now()<60000&&!renewing){renewing
 el('resource').onclick=()=>run(async()=>{if(expiresAt-Date.now()<60000)await renew();return api('/api/resource',{headers:{Authorization:'Bearer '+accessToken}});});
 el('logout').onclick=()=>{sessionVersion++;idToken='';accessToken='';expiresAt=0;el('result').textContent='画面内のトークンを破棄しました。発行済み JWT は期限まで有効です。';el('session').textContent='ログアウト済み';render();if(logoutUrl)location.assign(logoutUrl);};
 el('copyId').onclick=()=>run(()=>navigator.clipboard.writeText(idToken));el('copyAccess').onclick=()=>run(()=>navigator.clipboard.writeText(accessToken));
-run(async()=>{const d=await api('/api/session');logoutUrl=d.logout_url;el('login').hidden=!d.local_login_allowed;if(d.authenticated){idToken=d.id_token;el('session').textContent='SSO ログイン済み：'+d.user;}else{el('session').textContent=d.local_login_allowed?'ローカルログインが利用できます':'SSO ログインが必要です';}});
+run(async()=>{const d=await api('/api/session');logoutUrl=d.logout_url;el('login').hidden=!d.local_login_allowed;if(d.authenticated){idToken=d.id_token;el('session').textContent='SSO ログイン済み：'+d.user;}else{el('session').textContent=d.local_login_allowed?'ローカルログインが利用できます':'SSO ログインが必要です（ログイン済みなら、ID トークンがプロキシから届いていません。下の説明を参照）';}});
 </script></html>
