@@ -38,7 +38,7 @@ docker run --rm -p 8080:8080 -e APP_ALLOW_LOCAL_LOGIN -e APP_ACCESS_TOKEN_SIGNIN
 | 領域 | 環境変数 | 内容 |
 |---|---|---|
 | SSO 共通 | `SSO_ID_TOKEN_HEADER` | ID トークンのヘッダー名。既定 `X-Forwarded-Id-Token`。実際の proxy 設定に合わせる |
-| SSO 共通 | `SSO_GOOGLE_CLIENT_ID` | Google ID トークンの期待する `aud`。SSO-only では必須 |
+| SSO 共通 | `SSO_GOOGLE_CLIENT_ID` | SSO 基盤の CLIENT_ID と同じ値（正本は SSO 基盤側）。トークンの `aud` の検証に使う。SSO-only では必須 |
 | SSO 共通 | `SSO_LOGOUT_URL` | 任意。信頼する proxy のログアウト URL |
 | アプリ専用 | `APP_ALLOW_LOCAL_LOGIN` | 既定 `false`。`true` のときヘッダーなしでデモログイン可能 |
 | アプリ専用 | `APP_ACCESS_TOKEN_SIGNING_KEY` | 必須。32 バイト以上のランダムな秘密鍵 |
