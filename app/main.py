@@ -11,10 +11,14 @@ from jwt import PyJWKClient
 from pydantic import BaseModel, Field
 
 
+# Non-standard header the reverse proxy uses to hand the Google ID token to this app.
+# (The standard "Authorization" header is reserved here for the app's own access tokens.)
+ID_TOKEN_HEADER = "X-Forwarded-Id-Token"
+
+
 @dataclass(frozen=True)
 class Settings:
     allow_local: bool = False
-    id_header: str = "X-Forwarded-Id-Token"
     google_client_id: str = ""
     logout_url: str = ""
     signing_key: str = ""
@@ -28,7 +32,6 @@ class Settings:
         os_getenv = (environ if environ is not None else os.environ).get
         return cls(
             allow_local=os_getenv("APP_ALLOW_LOCAL_LOGIN", "false").lower() == "true",
-            id_header=os_getenv("SSO_ID_TOKEN_HEADER", "X-Forwarded-Id-Token"),
             google_client_id=os_getenv("SSO_GOOGLE_CLIENT_ID", ""),
             logout_url=os_getenv("SSO_LOGOUT_URL", ""),
             signing_key=os_getenv("APP_ACCESS_TOKEN_SIGNING_KEY", ""),
@@ -96,12 +99,12 @@ def create_app(settings=None, google_keys=None):
 
     def proxy_token(request):
         # The proxy may forward the ID token as "Bearer <token>" (Authorization style) or bare.
-        value = request.headers[cfg.id_header].strip()
+        value = request.headers[ID_TOKEN_HEADER].strip()
         scheme, _, rest = value.partition(" ")
         return rest.strip() if scheme.lower() == "bearer" and rest.strip() else value
 
-    def unauthorized():
-        return HTTPException(401, "Invalid or missing token", headers={"WWW-Authenticate": "Bearer"})
+    def unauthorized(detail="Invalid or missing token"):
+        return HTTPException(401, detail, headers={"WWW-Authenticate": "Bearer"})
 
     def mint(subject, kind, audience, ttl, **extra):
         now = int(time.time())
@@ -117,7 +120,7 @@ def create_app(settings=None, google_keys=None):
             raise jwt.InvalidTokenError()
         return claims
 
-    def identity(token, from_proxy=False):
+    def identity(token, from_proxy=False, explain=False):
         try:
             # Proxy headers always require a Google token, even when local login is enabled.
             if not from_proxy and cfg.allow_local:
@@ -133,8 +136,11 @@ def create_app(settings=None, google_keys=None):
             if not claims["sub"]:
                 raise jwt.InvalidTokenError()
             return claims
-        except (jwt.PyJWTError, ValueError):
-            raise unauthorized()
+        except (jwt.PyJWTError, ValueError) as exc:
+            # Only /api/session explains the reason, to help debug the proxy setup.
+            if explain:
+                raise unauthorized(f"{ID_TOKEN_HEADER} was received but is not valid: {exc}") from exc
+            raise unauthorized() from exc
 
     @api.get("/")
     def index():
@@ -150,12 +156,14 @@ def create_app(settings=None, google_keys=None):
 
     @api.get("/api/session")
     def session(request: Request):
-        if cfg.id_header in request.headers:
+        if ID_TOKEN_HEADER in request.headers:
             token = proxy_token(request)
-            claims = identity(token, from_proxy=True)
+            claims = identity(token, from_proxy=True, explain=True)
             return {"authenticated": True, "user": claims["sub"], "id_token": token,
+                    "id_token_header": {"name": ID_TOKEN_HEADER, "received": True},
                     "local_login_allowed": False, "logout_url": cfg.logout_url}
         return {"authenticated": False, "local_login_allowed": cfg.allow_local,
+                "id_token_header": {"name": ID_TOKEN_HEADER, "received": False},
                 "logout_url": cfg.logout_url}
 
     @api.get("/api/token-policy")
@@ -164,7 +172,7 @@ def create_app(settings=None, google_keys=None):
 
     @api.post("/api/login")
     def login(body: Login, request: Request):
-        if cfg.id_header in request.headers:
+        if ID_TOKEN_HEADER in request.headers:
             identity(proxy_token(request), from_proxy=True)
             raise HTTPException(403, "Use your SSO session")
         if not cfg.allow_local:
@@ -175,7 +183,7 @@ def create_app(settings=None, google_keys=None):
 
     @api.post("/api/token")
     def exchange(body: Exchange, request: Request):
-        proxy = cfg.id_header in request.headers
+        proxy = ID_TOKEN_HEADER in request.headers
         token = proxy_token(request) if proxy else body.id_token
         if not token:
             raise unauthorized()

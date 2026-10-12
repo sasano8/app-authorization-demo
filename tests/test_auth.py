@@ -6,7 +6,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
 
-from app.main import Settings, create_app
+from app.main import ID_TOKEN_HEADER, Settings, create_app
 
 KEY = 'test-only-signing-key-with-at-least-32-bytes'
 CFG = Settings(allow_local=True, signing_key=KEY, google_client_id='google-client')
@@ -53,7 +53,7 @@ def test_local_flow(client):
 
 @pytest.mark.parametrize('overrides', [{}, {'iss':'accounts.google.com'}])
 def test_google_flow(client, overrides):
-    headers = {CFG.id_header:google_token(**overrides)}
+    headers = {ID_TOKEN_HEADER:google_token(**overrides)}
     assert client.get('/api/session', headers=headers).json()['authenticated']
     token = client.post('/api/token', json={}, headers=headers)
     assert token.status_code == 200
@@ -62,12 +62,12 @@ def test_google_flow(client, overrides):
 
 @pytest.mark.parametrize('overrides', [{'aud':'other'}, {'iss':'evil'}, {'exp':0}])
 def test_google_invalid(client, overrides):
-    headers = {CFG.id_header:google_token(**overrides)}
+    headers = {ID_TOKEN_HEADER:google_token(**overrides)}
     assert client.post('/api/token', json={}, headers=headers).status_code == 401
 
 @pytest.mark.parametrize('token', ['invalid', ''])
 def test_no_fallback_for_bad_proxy_header(client, token):
-    headers = {CFG.id_header:token}
+    headers = {ID_TOKEN_HEADER:token}
     assert client.get('/api/session', headers=headers).status_code == 401
     assert client.post('/api/login', json={'username':'demo','password':'demo'}, headers=headers).status_code == 401
     assert client.post('/api/token', json={}, headers=headers).status_code == 401
@@ -98,7 +98,7 @@ def test_invalid_signing_key():
 
 @pytest.mark.parametrize('ttl', [1, 86400, 2592000])
 def test_requested_ttl(client, ttl):
-    response = client.post('/api/token', headers={CFG.id_header:google_token()}, json={'ttl_seconds':ttl})
+    response = client.post('/api/token', headers={ID_TOKEN_HEADER:google_token()}, json={'ttl_seconds':ttl})
     assert response.status_code == 200
     data = response.json()
     assert data['expires_in'] == ttl
@@ -108,7 +108,7 @@ def test_requested_ttl(client, ttl):
 
 @pytest.mark.parametrize('ttl', [0, -1, 2592001, 1.5, '3600', True])
 def test_invalid_requested_ttl(client, ttl):
-    assert client.post('/api/token', headers={CFG.id_header:google_token()}, json={'ttl_seconds':ttl}).status_code == 422
+    assert client.post('/api/token', headers={ID_TOKEN_HEADER:google_token()}, json={'ttl_seconds':ttl}).status_code == 422
 
 def test_custom_ttl_policy():
     cfg = Settings(allow_local=True, signing_key=KEY, ttl=60, max_ttl=120)
@@ -140,5 +140,17 @@ def test_check_env_reports_every_problem_without_values():
 def test_proxy_token_accepts_optional_bearer_prefix(client, prefix):
     cfg = Settings(allow_local=False, signing_key=KEY, google_client_id='google-client')
     sso = TestClient(create_app(cfg, GoogleKeys()))
-    r = sso.get('/api/session', headers={cfg.id_header: prefix + google_token()})
+    r = sso.get('/api/session', headers={ID_TOKEN_HEADER: prefix + google_token()})
     assert r.json()['authenticated'] is True
+
+
+def test_session_reports_header_status(client):
+    missing = client.get('/api/session').json()
+    assert missing['id_token_header'] == {'name': ID_TOKEN_HEADER, 'received': False}
+    ok = client.get('/api/session', headers={ID_TOKEN_HEADER: google_token()}).json()
+    assert ok['id_token_header'] == {'name': ID_TOKEN_HEADER, 'received': True}
+    bad = client.get('/api/session', headers={ID_TOKEN_HEADER: 'not-a-jwt'})
+    assert bad.status_code == 401
+    assert ID_TOKEN_HEADER in bad.json()['detail'] and 'not valid' in bad.json()['detail']
+    other = client.post('/api/token', json={}, headers={ID_TOKEN_HEADER: 'not-a-jwt'})
+    assert other.json()['detail'] == 'Invalid or missing token'
